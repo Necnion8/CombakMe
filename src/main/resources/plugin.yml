@@ -1,0 +1,9 @@
+name: CombakMe
+version: '${version}'
+main: com.gmail.necnionch.myplugin.combakme.bukkit.CombakMePlugin
+api-version: '1.13'
+author: Necnion8
+website: https://github.com/Necnion8/CombakMe
+
+depend:
+  - DiscordSRV
