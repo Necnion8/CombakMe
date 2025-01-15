@@ -25,7 +25,7 @@ messages:
       contents:
         - "今日も参加しませんか？"
 
-# 通常の messages 設定にある経過時間を超えた後のメッセージ設定
+# 通常の messages 設定にある経過時間を超えた後のメッセージ設定 (繰り返し)
 message-2:
   enable: false
   delay-minutes-min: 0
