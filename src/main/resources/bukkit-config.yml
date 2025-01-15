@@ -1,0 +1,33 @@
+
+# 通知メッセージの ON/OFF
+# 権限 combakme.disable-notify があるプレイヤーに対しては送信しません
+enable-messages: true
+
+# 各時間ごとにメッセージの内容を設定できます
+messages:
+  - elapsed-hours: 12  # 最終ログインから経過した時間
+    contents:  # ランダムで送信する内容を決定します
+      - "サーバーをログアウトしてから１２時間経過しました"
+
+    sub-message:
+      elapsed-minutes-min: 0
+      elapsed-minutes-max: -30  # 負の値で次回の通知時刻から差し引く (次回がない場合は無効)
+      contents:
+        - "やり残したことはありませんか？"
+
+  - elapsed-hours: 24
+    contents:
+      - "サーバーをログアウトしてから２４時間経過しました"
+
+    sub-message:
+      elapsed-minutes-min: 0
+      elapsed-minutes-max: -30
+      contents:
+        - "今日も参加しませんか？"
+
+# 通常の messages 設定にある経過時間を超えた後のメッセージ設定
+message-2:
+  enable: false
+  delay-minutes-min: 0
+  delay-minutes-max: 15
+  contents: []
