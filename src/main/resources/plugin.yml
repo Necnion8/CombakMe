@@ -7,3 +7,10 @@ website: https://github.com/Necnion8/CombakMe
 
 depend:
   - DiscordSRV
+
+softdepend:
+  - Vault
+
+permissions:
+  combakme.disable-notify:
+    description: "この権限があるプレイヤーに対しては通知メッセージを送信しません"

@@ -26,6 +26,10 @@ repositories {
     maven {  // JDA
         url = "https://m2.dv8tion.net/releases"
     }
+
+    maven {  // Vault
+        url = 'https://jitpack.io'
+    }
 }
 
 dependencies {
@@ -33,6 +37,7 @@ dependencies {
     compileOnly "org.spigotmc:spigot-api:1.13.2-R0.1-SNAPSHOT"
     compileOnly "com.discordsrv:discordsrv:1.29.0"
     implementation "com.zaxxer:HikariCP:4.0.3" exclude group: "org.slf4j"
+    compileOnly "com.github.MilkBowl:VaultAPI:1.7"
 }
 
 tasks.named("shadowJar", ShadowJar) {
