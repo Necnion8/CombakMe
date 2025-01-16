@@ -1,5 +1,8 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+
 plugins {
     id 'java'
+    id "com.gradleup.shadow" version "8.3.0"
 }
 
 group = 'com.gmail.necnionch.myplugin.combakme'
@@ -26,9 +29,18 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.jetbrains:annotations:24.0.0'
+    compileOnly 'org.jetbrains:annotations:24.0.0'
     compileOnly "org.spigotmc:spigot-api:1.13.2-R0.1-SNAPSHOT"
     compileOnly "com.discordsrv:discordsrv:1.29.0"
+    implementation "com.zaxxer:HikariCP:4.0.3" exclude group: "org.slf4j"
+}
+
+tasks.named("shadowJar", ShadowJar) {
+    archiveClassifier.set("")
+    dependencies {
+        exclude "/META-INF/**"
+    }
+    relocate "com.zaxxer.hikari", "${project.group}.libs.hikari"
 }
 
 def targetJavaVersion = 8
