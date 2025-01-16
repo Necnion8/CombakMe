@@ -1,5 +1,6 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit.config;
 
+import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
 import com.gmail.necnionch.myplugin.combakme.common.BukkitConfigDriver;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.MemoryConfiguration;
@@ -76,6 +77,19 @@ public class CombakMeConfig extends BukkitConfigDriver {
         return true;
     }
 
+    public MySQLDatabase.Config getMySQLConfig() {
+        String username = config.getString("database.mysql.username", "root");
+        String password = config.getString("database.mysql.password", "password");
+        String address = config.getString("database.mysql.address", "localhost:3306");
+        String database = config.getString("database.mysql.database", "combakme");
+
+        @SuppressWarnings("DataFlowIssue")
+        Map<String, Object> options = Optional.ofNullable(config.getConfigurationSection("database.mysql.options"))
+                .map(c -> c.getKeys(false).stream().collect(Collectors.toMap(k -> k, c::get)))
+                .orElseGet(Collections::emptyMap);
+
+        return new MySQLDatabase.Config(address, database, username, password, options);
+    }
 
     //
 
@@ -83,5 +97,12 @@ public class CombakMeConfig extends BukkitConfigDriver {
         return config.getBoolean("enable-messages", false);
     }
 
+    public List<TimeMessage> getMessages() {
+        return messages;
+    }
+
+    public @Nullable TimeMessage2 getMessage2() {
+        return message2;
+    }
 
 }

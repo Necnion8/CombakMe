@@ -31,3 +31,15 @@ message-2:
   delay-minutes-min: 0
   delay-minutes-max: 15
   contents: []
+
+
+# データベース設定
+database:
+  type: mysql  # 現在は mysql のみ
+  mysql:
+    username: root
+    password: "password"
+    address: localhost:3306
+    database: "combakme"
+    options:
+      autoReconnect: true
