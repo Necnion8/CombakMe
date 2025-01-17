@@ -10,18 +10,20 @@ import github.scarsz.discordsrv.objects.managers.AccountLinkManager;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Nullable;
 
-import java.sql.SQLException;
 import java.util.*;
-import java.util.stream.Collectors;
 
-public final class CombakMePlugin extends JavaPlugin {
+public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     public static final String DISABLE_NOTIFY_PERMISSION = "combakme.disable-notify";
 
+    private final Random random = new Random();
     private final CombakMeConfig mainConfig = new CombakMeConfig(this);
     private final CombakScheduler scheduler = new CombakScheduler();
     private @Nullable Database database;
@@ -33,6 +35,8 @@ public final class CombakMePlugin extends JavaPlugin {
         setupVaultPermission();
         mainConfig.load();
         openDatabase();
+
+        getServer().getPluginManager().registerEvents(this, this);
     }
 
     @Override
@@ -125,49 +129,66 @@ public final class CombakMePlugin extends JavaPlugin {
     public void scheduleAll() {
         scheduler.cancelAll();
 
+        long nowTime = System.currentTimeMillis();
+        for (UUID playerId : getDiscordLinkedPlayers().values()) {
+            OfflinePlayer player = getServer().getOfflinePlayer(playerId);
+            schedule(player, nowTime);
+        }
+
+    }
+
+    public void schedule(OfflinePlayer player, long nowTime) {
+        scheduler.cancel(player.getUniqueId());
+
+        long lastPlayed = player.getLastPlayed();
+        if (player.isOnline() || lastPlayed == 0 || hasPermission(player, DISABLE_NOTIFY_PERMISSION)) {
+            return;  // TODO: test me offline
+        }
+
         List<TimeMessage> messages = mainConfig.getMessages();
         TimeMessage2 message2 = mainConfig.getMessage2();
 
-        Map<UUID, CombakPlayer> players;
-        try {
-            players = getDatabase().getPlayerAll()
-                    .stream()
-                    .collect(Collectors.toMap(CombakPlayer::getId, p -> p));
+        // 最終ログイン経過時間よりも後の時間を選択する
+        TimeMessage timeMessage = messages.stream()
+                .filter(time -> nowTime - lastPlayed < time.getElapsedHours() * 60L * 60 * 1000)
+                .findFirst()
+                .orElse(null);
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-            getLogger().warning("Unable to lookup combak players from database");
-            return;
+        if (timeMessage != null) {
+            // set time schedule
+            scheduler.add(
+                    player.getUniqueId(),
+                    lastPlayed + (timeMessage.getElapsedHours() * 60L * 60 * 1000) - nowTime,
+                    () -> onTime(player, timeMessage)
+            );
+
+        } else if (message2 != null && message2.isEnable()) {
+            // set loop send (messages empty)
+            float delay = message2.getDelayMinutesMin();
+            delay += (message2.getDelayMinutesMax() - message2.getDelayMinutesMin()) * random.nextFloat();
+            scheduler.add(
+                    player.getUniqueId(),
+                    (long) delay * 60 * 1000,
+                    () -> onTime(player, message2)
+            );
         }
+    }
 
-        for (UUID playerId : getDiscordLinkedPlayers().values()) {
-            if (hasPermission(playerId, DISABLE_NOTIFY_PERMISSION)) {
-                continue;  // TODO: test me offline
-            }
+    // events
 
-            TimeMessage timeMessage = messages.isEmpty() ? null : messages.get(0);
+    public void onJoin(PlayerJoinEvent event) {
+        scheduler.cancel(event.getPlayer().getUniqueId());
+    }
 
-            if (players.containsKey(playerId)) {
-                OptionalInt val = players.get(playerId).getLastNotifyHours();
-                if (val.isPresent()) {
-                    int hours = val.getAsInt();
-                    timeMessage = null;
-                    for (TimeMessage timeMsg : messages) {
-                        if (hours < timeMsg.getElapsedHours()) {
-                            timeMessage = timeMsg;  // next time
-                            break;
-                        }
-                    }
-                }
-            }
+    public void onQuit(PlayerQuitEvent event) {
+        schedule(event.getPlayer(), System.currentTimeMillis());
+    }
 
-            if (timeMessage != null) {
-                // set time schedule
-            } else {
-                // set loop send (messages empty)
-            }
-        }
+    private void onTime(OfflinePlayer player, TimeMessage message) {
 
+    }
+
+    private void onTime(OfflinePlayer player, TimeMessage2 message) {
 
     }
 
