@@ -25,7 +25,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     private final Random random = new Random();
     private final CombakMeConfig mainConfig = new CombakMeConfig(this);
-    private final CombakScheduler scheduler = new CombakScheduler();
+    private final CombakScheduler scheduler = new CombakScheduler(task -> getServer().getScheduler().runTask(this, task));
     private @Nullable Database database;
     private final DiscordSRV srv = DiscordSRV.getPlugin();
     private @Nullable Permission vaultPermission;
@@ -137,12 +137,12 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     }
 
-    public void schedule(OfflinePlayer player, long nowTime) {
+    public @Nullable TimeMessage schedule(OfflinePlayer player, long nowTime) {
         scheduler.cancel(player.getUniqueId());
 
         long lastPlayed = player.getLastPlayed();
         if (player.isOnline() || lastPlayed == 0 || hasPermission(player, DISABLE_NOTIFY_PERMISSION)) {
-            return;  // TODO: test me offline
+            return null;
         }
 
         List<TimeMessage> messages = mainConfig.getMessages();
@@ -172,6 +172,20 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
                     () -> onTime(player, message2)
             );
         }
+
+        return timeMessage;
+    }
+
+    public void sendDiscordNotify(OfflinePlayer player, TimeMessage message) {
+
+    }
+
+    public void sendDiscordNotify(OfflinePlayer player, TimeMessage2 message) {
+
+    }
+
+    public void sendDiscordNotify(OfflinePlayer player, TimeMessage.SubMessage message) {
+
     }
 
     // events
@@ -181,15 +195,45 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     }
 
     public void onQuit(PlayerQuitEvent event) {
+        // 切断した即座ではなく、最初の通知時間が近づいた時にスケジュールするべき？
         schedule(event.getPlayer(), System.currentTimeMillis());
     }
 
     private void onTime(OfflinePlayer player, TimeMessage message) {
+        sendDiscordNotify(player, message);
+
+        long nowTime = System.currentTimeMillis();
+        TimeMessage nextMessage = schedule(player, nowTime);
+
+        TimeMessage.SubMessage sub = message.getSubMessage();
+        if (sub != null && !sub.getContents().isEmpty()) {
+            int min = sub.getElapsedMinutesMin();
+            int max = sub.getElapsedMinutesMax();
+            long minMillis = min * 60L * 1000;
+            long maxMillis = max * 60L * 1000;
+
+            int nextHours = Optional.ofNullable(nextMessage).map(TimeMessage::getElapsedHours).orElse(0);
+            if (nextMessage == null && (min < 0 || max < 0)) {
+                return;
+            }
+
+            long delay = player.getLastPlayed() + (nextHours * 60L * 60 * 1000) - nowTime;
+            if (min < 0) {
+                minMillis = delay + (min * 60L * 1000);
+            }
+            if (max < 0) {
+                maxMillis = delay + (max * 60L * 1000);
+            }
+
+            long subDelay = (long) (minMillis + ((maxMillis - minMillis) * random.nextDouble()));
+            scheduler.add(player.getUniqueId(), subDelay, () -> sendDiscordNotify(player, sub));
+        }
 
     }
 
     private void onTime(OfflinePlayer player, TimeMessage2 message) {
-
+        sendDiscordNotify(player, message);
+        schedule(player, System.currentTimeMillis());
     }
 
 }

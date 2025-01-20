@@ -1,13 +1,21 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit;
 
-import java.util.*;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.UUID;
+import java.util.function.Consumer;
 
 public class CombakScheduler {
 
     private final Timer timer = new Timer("CombakMe-Scheduler", true);
-    private final Map<UUID, TimerTask> playerTasks = Collections.synchronizedMap(new HashMap<>());
+    private final Multimap<UUID, TimerTask> playerTasks = ArrayListMultimap.create();
+    private final Consumer<Runnable> caller;
 
-    public CombakScheduler() {
+    public CombakScheduler(Consumer<Runnable> caller) {
+        this.caller = caller;
     }
 
     public void cancelAll() {
@@ -23,12 +31,11 @@ public class CombakScheduler {
 
 
     public void add(UUID playerId, long delay, Runnable task) {
-        cancel(playerId);
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
                 playerTasks.values().remove(this);
-                task.run();
+                caller.accept(task);
             }
         };
         playerTasks.put(playerId, timerTask);
@@ -37,7 +44,8 @@ public class CombakScheduler {
 
     public void cancel(UUID playerId) {
         if (playerTasks.containsKey(playerId)) {
-            playerTasks.remove(playerId).cancel();
+            playerTasks.get(playerId).forEach(TimerTask::cancel);
+            playerTasks.removeAll(playerId);
         }
     }
 
