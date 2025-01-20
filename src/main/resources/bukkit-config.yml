@@ -5,31 +5,34 @@ enable-messages: true
 
 # 各時間ごとにメッセージの内容を設定できます
 messages:
-  - elapsed-hours: 12  # 最終ログインから経過した時間
+  - schedule-time: 12h0m  # 最終ログインから12時間0分
     contents:  # ランダムで送信する内容を決定します
       - "サーバーをログアウトしてから１２時間経過しました"
 
-    sub-message:
-      elapsed-minutes-min: 0
-      elapsed-minutes-max: -30  # 負の値で次回の通知時刻から差し引く (次回がない場合は無効)
-      contents:
-        - "やり残したことはありませんか？"
+  - schedule-time: 12h0m,30m  # 最終ログインから12時間0分から12時間30分の間に1回
+    contents:
+      - "やり残したことはありませんか？"
 
-  - elapsed-hours: 24
+  - schedule-time: 24h  # 最終ログインから24時間0分 (0分は省略可)
     contents:
       - "サーバーをログアウトしてから２４時間経過しました"
 
-    sub-message:
-      elapsed-minutes-min: 0
-      elapsed-minutes-max: -30
-      contents:
-        - "今日も参加しませんか？"
+  - schedule-time: 24h,-30m  # 最終ログインから24時間0分から47時間30分の間に1回 (負の値で次回の通知時間から計算 ※範囲を考慮しない)
+    contents:
+      - "今日も参加しませんか？"
+
+  - schedule-time: 48h
+    contents:
+      - "サーバーをログアウトしてから４８時間経過しました"
+
+  - schedule-time: 48h,30m
+    contents:
+      - "今日も参加しませんか？"
 
 # 通常の messages 設定にある経過時間を超えた後のメッセージ設定 (繰り返し)
 message-2:
   enable: false
-  delay-minutes-min: 0
-  delay-minutes-max: 15
+  timer-time: 0m,15m
   contents: []
 
 
