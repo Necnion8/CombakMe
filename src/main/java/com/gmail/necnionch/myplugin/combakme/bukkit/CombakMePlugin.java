@@ -1,8 +1,8 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit;
 
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.CombakMeConfig;
+import com.gmail.necnionch.myplugin.combakme.bukkit.config.LoopMessage;
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.TimeMessage;
-import com.gmail.necnionch.myplugin.combakme.bukkit.config.TimeMessage2;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.Database;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
 import github.scarsz.discordsrv.DiscordSRV;
@@ -18,6 +18,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public final class CombakMePlugin extends JavaPlugin implements Listener {
 
@@ -137,54 +138,41 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     }
 
-    public @Nullable TimeMessage schedule(OfflinePlayer player, long nowTime) {
+    public void schedule(OfflinePlayer player, long nowTime) {
         scheduler.cancel(player.getUniqueId());
 
         long lastPlayed = player.getLastPlayed();
         if (player.isOnline() || lastPlayed == 0 || hasPermission(player, DISABLE_NOTIFY_PERMISSION)) {
-            return null;
+            return;
         }
 
         List<TimeMessage> messages = mainConfig.getMessages();
-        TimeMessage2 message2 = mainConfig.getMessage2();
+        LoopMessage messageLoop = mainConfig.getMessageLoop();
 
-        // 最終ログイン経過時間よりも後の時間を選択する
+        // 最終ログイン経過時間よりも後の最小時間を選択する
         TimeMessage timeMessage = messages.stream()
-                .filter(time -> nowTime - lastPlayed < time.getElapsedHours() * 60L * 60 * 1000)
+                .filter(time -> nowTime - lastPlayed < time.getScheduleMinutes() * 60L * 60 * 1000)
                 .findFirst()
                 .orElse(null);
 
         if (timeMessage != null) {
-            // set time schedule
-            scheduler.add(
-                    player.getUniqueId(),
-                    lastPlayed + (timeMessage.getElapsedHours() * 60L * 60 * 1000) - nowTime,
-                    () -> onTime(player, timeMessage)
-            );
+            int scheduleMinutes = timeMessage.getScheduleMinutes();
+            long delay = lastPlayed + (scheduleMinutes * 60L * 60 * 1000) - nowTime;
+            List<TimeMessage> times = messages.stream().filter(m -> m.getScheduleMinutes() == scheduleMinutes).collect(Collectors.toList());
+            scheduler.add(player.getUniqueId(), delay, () -> onTime(player, times));
 
-        } else if (message2 != null && message2.isEnable()) {
-            // set loop send (messages empty)
-            float delay = message2.getDelayMinutesMin();
-            delay += (message2.getDelayMinutesMax() - message2.getDelayMinutesMin()) * random.nextFloat();
-            scheduler.add(
-                    player.getUniqueId(),
-                    (long) delay * 60 * 1000,
-                    () -> onTime(player, message2)
-            );
+        } else if (messageLoop != null && messageLoop.isEnable()) {
+            long delay = messageLoop.getTimerMinutes() * 60L * 60 * 1000;
+            delay += (long) messageLoop.getTimerMinutesRange() * 60d * 1000 * random.nextFloat();
+            scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
         }
-
-        return timeMessage;
     }
 
     public void sendDiscordNotify(OfflinePlayer player, TimeMessage message) {
 
     }
 
-    public void sendDiscordNotify(OfflinePlayer player, TimeMessage2 message) {
-
-    }
-
-    public void sendDiscordNotify(OfflinePlayer player, TimeMessage.SubMessage message) {
+    public void sendDiscordNotify(OfflinePlayer player, LoopMessage message) {
 
     }
 
@@ -199,39 +187,26 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         schedule(event.getPlayer(), System.currentTimeMillis());
     }
 
-    private void onTime(OfflinePlayer player, TimeMessage message) {
-        sendDiscordNotify(player, message);
-
+    private void onTime(OfflinePlayer player, List<TimeMessage> messages) {
+        long lastPlayed = player.getLastPlayed();
         long nowTime = System.currentTimeMillis();
-        TimeMessage nextMessage = schedule(player, nowTime);
 
-        TimeMessage.SubMessage sub = message.getSubMessage();
-        if (sub != null && !sub.getContents().isEmpty()) {
-            int min = sub.getElapsedMinutesMin();
-            int max = sub.getElapsedMinutesMax();
-            long minMillis = min * 60L * 1000;
-            long maxMillis = max * 60L * 1000;
+        schedule(player, nowTime);
 
-            int nextHours = Optional.ofNullable(nextMessage).map(TimeMessage::getElapsedHours).orElse(0);
-            if (nextMessage == null && (min < 0 || max < 0)) {
-                return;
+        for (TimeMessage message : messages) {
+            int rangeMinutes = message.getScheduleMinutesRange();
+            if (rangeMinutes == 0) {
+                sendDiscordNotify(player, message);
+                continue;
             }
-
-            long delay = player.getLastPlayed() + (nextHours * 60L * 60 * 1000) - nowTime;
-            if (min < 0) {
-                minMillis = delay + (min * 60L * 1000);
-            }
-            if (max < 0) {
-                maxMillis = delay + (max * 60L * 1000);
-            }
-
-            long subDelay = (long) (minMillis + ((maxMillis - minMillis) * random.nextDouble()));
-            scheduler.add(player.getUniqueId(), subDelay, () -> sendDiscordNotify(player, sub));
+            long delay = lastPlayed + (message.getScheduleMinutes() * 60L * 60 * 1000) - nowTime;
+            delay += (long) rangeMinutes * 60d * 1000 * random.nextFloat();
+            scheduler.add(player.getUniqueId(), delay, () -> sendDiscordNotify(player, message));  // TODO: db check
         }
 
     }
 
-    private void onTime(OfflinePlayer player, TimeMessage2 message) {
+    private void onTime(OfflinePlayer player, LoopMessage message) {
         sendDiscordNotify(player, message);
         schedule(player, System.currentTimeMillis());
     }
