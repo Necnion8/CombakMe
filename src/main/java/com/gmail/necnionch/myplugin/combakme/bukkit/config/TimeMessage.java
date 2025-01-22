@@ -2,7 +2,7 @@ package com.gmail.necnionch.myplugin.combakme.bukkit.config;
 
 import java.util.List;
 
-public class TimeMessage {
+public class TimeMessage implements RandomMessage {
 
     private final int scheduleMinutes;
     private final int scheduleMinutesRange;
@@ -22,6 +22,7 @@ public class TimeMessage {
         return scheduleMinutesRange;
     }
 
+    @Override
     public List<String> getContents() {
         return contents;
     }

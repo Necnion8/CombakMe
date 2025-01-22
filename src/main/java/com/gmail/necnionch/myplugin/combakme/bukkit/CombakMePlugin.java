@@ -2,10 +2,12 @@ package com.gmail.necnionch.myplugin.combakme.bukkit;
 
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.CombakMeConfig;
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.LoopMessage;
+import com.gmail.necnionch.myplugin.combakme.bukkit.config.RandomMessage;
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.TimeMessage;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.Database;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
 import github.scarsz.discordsrv.DiscordSRV;
+import github.scarsz.discordsrv.dependencies.jda.api.entities.User;
 import github.scarsz.discordsrv.objects.managers.AccountLinkManager;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.OfflinePlayer;
@@ -18,6 +20,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public final class CombakMePlugin extends JavaPlugin implements Listener {
@@ -38,6 +41,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         openDatabase();
 
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getScheduler().runTask(this, this::scheduleAll);  // wait for srv load
     }
 
     @Override
@@ -124,11 +128,16 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     public Map<String, UUID> getDiscordLinkedPlayers() {
         AccountLinkManager links = srv.getAccountLinkManager();
+        if (links == null)
+            throw new IllegalStateException("DiscordSRV AccountLinkManager is not loaded");
         return links.getLinkedAccounts();
     }
 
     public void scheduleAll() {
         scheduler.cancelAll();
+
+        if (!srv.isEnabled())
+            return;
 
         long nowTime = System.currentTimeMillis();
         for (UUID playerId : getDiscordLinkedPlayers().values()) {
@@ -168,11 +177,26 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         }
     }
 
-    public void sendDiscordNotify(OfflinePlayer player, TimeMessage message) {
+    public void sendDiscordNotify(OfflinePlayer player, RandomMessage message) {
+        List<String> contents = message.getContents();
+        if (!srv.isEnabled() || srv.getJda() == null || contents.isEmpty())
+            return;
 
-    }
+        String discordId = srv.getAccountLinkManager().getDiscordId(player.getUniqueId());
+        if (discordId == null)
+            return;
 
-    public void sendDiscordNotify(OfflinePlayer player, LoopMessage message) {
+        Consumer<User> sendMessage = user -> user.openPrivateChannel().queue(channel -> {
+            String content = contents.get(new Random().nextInt(contents.size()));
+            channel.sendMessage(content).queue();
+        });
+
+        User user = srv.getJda().getUserById(discordId);
+        if (user == null) {
+            srv.getJda().retrieveUserById(discordId).queue(sendMessage);
+        } else {
+            sendMessage.accept(user);
+        }
 
     }
 

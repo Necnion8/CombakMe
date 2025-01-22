@@ -2,7 +2,7 @@ package com.gmail.necnionch.myplugin.combakme.bukkit.config;
 
 import java.util.List;
 
-public class LoopMessage {
+public class LoopMessage implements RandomMessage {
 
     private final boolean enable;
     private final List<String> contents;
@@ -28,6 +28,7 @@ public class LoopMessage {
         return timerMinutesRange;
     }
 
+    @Override
     public List<String> getContents() {
         return contents;
     }
