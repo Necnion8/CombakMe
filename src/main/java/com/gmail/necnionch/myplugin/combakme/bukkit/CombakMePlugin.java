@@ -12,6 +12,7 @@ import github.scarsz.discordsrv.objects.managers.AccountLinkManager;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -21,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public final class CombakMePlugin extends JavaPlugin implements Listener {
@@ -29,7 +31,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     private final Random random = new Random();
     private final CombakMeConfig mainConfig = new CombakMeConfig(this);
-    private final CombakScheduler scheduler = new CombakScheduler(task -> getServer().getScheduler().runTask(this, task));
+    private final CombakScheduler scheduler = new CombakScheduler(this, task -> getServer().getScheduler().runTask(this, task));
     private @Nullable Database database;
     private final DiscordSRV srv = DiscordSRV.getPlugin();
     private @Nullable Permission vaultPermission;
@@ -38,7 +40,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     public void onEnable() {
         setupVaultPermission();
         mainConfig.load();
-        openDatabase();
+//        openDatabase();
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getScheduler().runTask(this, this::scheduleAll);  // wait for srv load
@@ -48,6 +50,16 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     public void onDisable() {
         scheduler.destroy();
         closeDatabase();
+    }
+
+    public void d(String message) {
+        if (mainConfig.isDebug())
+            getLogger().warning("[DEBUG]: " + message);
+    }
+
+    public void d(Supplier<String> message) {
+        if (mainConfig.isDebug())
+            getLogger().warning("[DEBUG]: " + message.get());
     }
 
     public void openDatabase() {
@@ -134,13 +146,17 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     }
 
     public void scheduleAll() {
+        d("on scheduleAll");
         scheduler.cancelAll();
 
         if (!srv.isEnabled())
             return;
 
         long nowTime = System.currentTimeMillis();
-        for (UUID playerId : getDiscordLinkedPlayers().values()) {
+        d(() -> "now time: " + nowTime);
+        Map<String, UUID> links = getDiscordLinkedPlayers();
+        d(() -> "linked players -> " + links.size());
+        for (UUID playerId : links.values()) {
             OfflinePlayer player = getServer().getOfflinePlayer(playerId);
             schedule(player, nowTime);
         }
@@ -148,9 +164,11 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     }
 
     public void schedule(OfflinePlayer player, long nowTime) {
+        d(() -> "on schedule : " + player.getUniqueId() + " (" + player.getName() + ")");
         scheduler.cancel(player.getUniqueId());
 
         long lastPlayed = player.getLastPlayed();
+        d(() -> "lastPlayed -> " + lastPlayed + " (" + Math.round((nowTime - lastPlayed) / 1000d / 60) + "m)");
         if (player.isOnline() || lastPlayed == 0 || hasPermission(player, DISABLE_NOTIFY_PERMISSION)) {
             return;
         }
@@ -165,29 +183,39 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
                 .orElse(null);
 
         if (timeMessage != null) {
+            d("-> time message");
             int scheduleMinutes = timeMessage.getScheduleMinutes();
             long delay = lastPlayed + (scheduleMinutes * 60L * 60 * 1000) - nowTime;
             List<TimeMessage> times = messages.stream().filter(m -> m.getScheduleMinutes() == scheduleMinutes).collect(Collectors.toList());
             scheduler.add(player.getUniqueId(), delay, () -> onTime(player, times));
 
         } else if (messageLoop != null && messageLoop.isEnable()) {
+            d("-> loop message");
             long delay = messageLoop.getTimerMinutes() * 60L * 60 * 1000;
             delay += (long) messageLoop.getTimerMinutesRange() * 60d * 1000 * random.nextFloat();
             scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
+        } else {
+            d("-> else");
         }
     }
 
     public void sendDiscordNotify(OfflinePlayer player, RandomMessage message) {
+        d(() -> "on send notify : " + player.getUniqueId());
         List<String> contents = message.getContents();
-        if (!srv.isEnabled() || srv.getJda() == null || contents.isEmpty())
+        if (!srv.isEnabled() || srv.getJda() == null || contents.isEmpty()) {
+            d("cancelled -> JDA not available or empty contents");
             return;
+        }
 
         String discordId = srv.getAccountLinkManager().getDiscordId(player.getUniqueId());
-        if (discordId == null)
+        if (discordId == null) {
+            d("cancelled -> No linked player");
             return;
+        }
 
         Consumer<User> sendMessage = user -> user.openPrivateChannel().queue(channel -> {
             String content = contents.get(new Random().nextInt(contents.size()));
+            d(() -> "queue message : " + player.getUniqueId() + " : Discord " + user.getName());
             channel.sendMessage(content).queue();
         });
 
@@ -202,16 +230,19 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     // events
 
+    @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         scheduler.cancel(event.getPlayer().getUniqueId());
     }
 
+    @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         // 切断した即座ではなく、最初の通知時間が近づいた時にスケジュールするべき？
         schedule(event.getPlayer(), System.currentTimeMillis());
     }
 
     private void onTime(OfflinePlayer player, List<TimeMessage> messages) {
+        d(() -> "on time (timeMessage): " + player.getUniqueId());
         long lastPlayed = player.getLastPlayed();
         long nowTime = System.currentTimeMillis();
 
@@ -231,6 +262,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     }
 
     private void onTime(OfflinePlayer player, LoopMessage message) {
+        d(() -> "on time (loopMessage): " + player.getUniqueId());
         sendDiscordNotify(player, message);
         schedule(player, System.currentTimeMillis());
     }

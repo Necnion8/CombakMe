@@ -10,15 +10,18 @@ import java.util.function.Consumer;
 
 public class CombakScheduler {
 
+    public final CombakMePlugin plugin;
     private final Timer timer = new Timer("CombakMe-Scheduler", true);
     private final Multimap<UUID, TimerTask> playerTasks = ArrayListMultimap.create();
     private final Consumer<Runnable> caller;
 
-    public CombakScheduler(Consumer<Runnable> caller) {
+    public CombakScheduler(CombakMePlugin plugin, Consumer<Runnable> caller) {
+        this.plugin = plugin;
         this.caller = caller;
     }
 
     public void cancelAll() {
+        plugin.d("cancel all");
         playerTasks.values().forEach(TimerTask::cancel);
         playerTasks.clear();
         timer.cancel();
@@ -34,16 +37,19 @@ public class CombakScheduler {
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
+                plugin.d(() -> "on schedule task : " + playerId);
                 playerTasks.values().remove(this);
                 caller.accept(task);
             }
         };
+        plugin.d(() -> "add schedule : " + playerId + " : delay=" + delay + " (" + Math.round(delay / 1000d / 60) + "m)");
         playerTasks.put(playerId, timerTask);
         timer.schedule(timerTask, delay);
     }
 
     public void cancel(UUID playerId) {
         if (playerTasks.containsKey(playerId)) {
+            plugin.d(() -> "cancel schedule : " + playerId);
             playerTasks.get(playerId).forEach(TimerTask::cancel);
             playerTasks.removeAll(playerId);
         }

@@ -17,6 +17,7 @@ public class CombakMeConfig extends BukkitConfigDriver {
 
     private final List<TimeMessage> messages = new ArrayList<>();
     private @Nullable LoopMessage messageLoop;
+    private boolean debug;
 
     public CombakMeConfig(JavaPlugin plugin) {
         super(plugin);
@@ -54,6 +55,7 @@ public class CombakMeConfig extends BukkitConfigDriver {
     @Override
     public boolean onLoaded(FileConfiguration config) {
         messages.clear();
+        debug = config.getBoolean("debug", false);
 
         Optional.ofNullable(getConfigList(config, "messages"))
                 .ifPresent(ls -> ls.stream()
@@ -89,6 +91,10 @@ public class CombakMeConfig extends BukkitConfigDriver {
     }
 
     //
+
+    public boolean isDebug() {
+        return debug;
+    }
 
     public boolean isEnabledMessages() {
         return config.getBoolean("enable-messages", false);
