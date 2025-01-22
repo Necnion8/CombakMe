@@ -237,8 +237,12 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        // 切断した即座ではなく、最初の通知時間が近づいた時にスケジュールするべき？
-        schedule(event.getPlayer(), System.currentTimeMillis());
+        // getLastPlayed() が設定されたプレイヤーオブジェクトを使用する (イベント後に設定される？)
+        getServer().getScheduler().runTask(this, () -> {
+            OfflinePlayer player = getServer().getOfflinePlayer(event.getPlayer().getUniqueId());
+            // 切断した即座にスケジュールを処理するのはコストが高すぎる？
+            schedule(player, System.currentTimeMillis());
+        });
     }
 
     private void onTime(OfflinePlayer player, List<TimeMessage> messages) {
