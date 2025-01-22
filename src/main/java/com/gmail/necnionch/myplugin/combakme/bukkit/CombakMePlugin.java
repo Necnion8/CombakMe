@@ -178,20 +178,20 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
         // 最終ログイン経過時間よりも後の最小時間を選択する
         TimeMessage timeMessage = messages.stream()
-                .filter(time -> nowTime - lastPlayed < time.getScheduleMinutes() * 60L * 60 * 1000)
+                .filter(time -> nowTime - lastPlayed < time.getScheduleMinutes() * 60L * 1000)
                 .findFirst()
                 .orElse(null);
 
         if (timeMessage != null) {
             d("-> time message");
             int scheduleMinutes = timeMessage.getScheduleMinutes();
-            long delay = lastPlayed + (scheduleMinutes * 60L * 60 * 1000) - nowTime;
+            long delay = lastPlayed + (scheduleMinutes * 60L * 1000) - nowTime;
             List<TimeMessage> times = messages.stream().filter(m -> m.getScheduleMinutes() == scheduleMinutes).collect(Collectors.toList());
             scheduler.add(player.getUniqueId(), delay, () -> onTime(player, times));
 
         } else if (messageLoop != null && messageLoop.isEnable()) {
             d("-> loop message");
-            long delay = messageLoop.getTimerMinutes() * 60L * 60 * 1000;
+            long delay = messageLoop.getTimerMinutes() * 60L * 1000;
             delay += (long) messageLoop.getTimerMinutesRange() * 60d * 1000 * random.nextFloat();
             scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
         } else {
@@ -254,7 +254,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
                 sendDiscordNotify(player, message);
                 continue;
             }
-            long delay = lastPlayed + (message.getScheduleMinutes() * 60L * 60 * 1000) - nowTime;
+            long delay = lastPlayed + (message.getScheduleMinutes() * 60L * 1000) - nowTime;
             delay += (long) rangeMinutes * 60d * 1000 * random.nextFloat();
             scheduler.add(player.getUniqueId(), delay, () -> sendDiscordNotify(player, message));  // TODO: db check
         }

@@ -24,11 +24,11 @@ public class CombakScheduler {
         plugin.d("cancel all");
         playerTasks.values().forEach(TimerTask::cancel);
         playerTasks.clear();
-        timer.cancel();
     }
 
     public void destroy() {
         cancelAll();
+        timer.cancel();
         timer.purge();
     }
 
@@ -37,9 +37,13 @@ public class CombakScheduler {
         TimerTask timerTask = new TimerTask() {
             @Override
             public void run() {
-                plugin.d(() -> "on schedule task : " + playerId);
-                playerTasks.values().remove(this);
-                caller.accept(task);
+                try {
+                    plugin.d(() -> "on schedule task : " + playerId);
+                    playerTasks.values().remove(this);
+                    caller.accept(task);
+                } catch (Throwable e) {
+                    e.printStackTrace();
+                }
             }
         };
         plugin.d(() -> "add schedule : " + playerId + " : delay=" + delay + " (" + Math.round(delay / 1000d / 60) + "m)");
