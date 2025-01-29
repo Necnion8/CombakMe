@@ -61,16 +61,17 @@ public class CombakMeConfig extends BukkitConfigDriver {
                 .ifPresent(ls -> ls.stream()
                         .map(c -> new TimeMessage(
                                 parseTime(c.getString("schedule-time")),
-                                parseTimeRange(c.getString("schedule-time")),
+                                parseTimeMax(c.getString("schedule-time")),
                                 c.getStringList("contents")))
                         .filter(c -> 0 < c.getScheduleMinutes())
                         .forEach(messages::add));
-        messages.sort(Comparator.comparing(TimeMessage::getScheduleMinutes).thenComparing(m -> Math.abs(m.getScheduleMinutesRange())));
+        messages.sort(Comparator.comparing(TimeMessage::getScheduleMinutes)
+                .thenComparing(m -> Math.abs(Optional.ofNullable(m.getScheduleMinutesMax()).orElse(0))));
 
         messageLoop = new LoopMessage(
                 config.getBoolean("message-2.enable", false),
                 parseTime(config.getString("message-2.timer-time")),
-                parseTimeRange(config.getString("message-2.timer-time")),
+                parseTimeMax(config.getString("message-2.timer-time")),
                 config.getStringList("message-2.contents")
         );
         return true;
@@ -135,13 +136,13 @@ public class CombakMeConfig extends BukkitConfigDriver {
         return value;
     }
 
-    public static int parseTimeRange(@Nullable String string) {
+    public static @Nullable Integer parseTimeMax(@Nullable String string) {
         if (string == null || string.isEmpty())
-            return 0;
+            return null;
 
         String[] sp = string.split(",", 3);
-        if (sp.length < 3)
-            return 0;
+        if (sp.length < 2)
+            return null;
 
         try {
             return Math.max(0, Integer.parseInt(sp[1]));
@@ -158,6 +159,8 @@ public class CombakMeConfig extends BukkitConfigDriver {
                 value += Integer.parseInt(m.group(1));
             }
         }
+        if (value == 0)
+            return null;
         return negative ? -value : value;
     }
 

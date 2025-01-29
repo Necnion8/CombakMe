@@ -192,7 +192,9 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         } else if (messageLoop != null && messageLoop.isEnable()) {
             d("-> loop message");
             long delay = messageLoop.getTimerMinutes() * 60L * 1000;
-            delay += (long) messageLoop.getTimerMinutesRange() * 60d * 1000 * random.nextFloat();
+            if (messageLoop.getTimerMinutesMax() != null) {
+                delay += (long) messageLoop.getTimerMinutesMax() * 60d * 1000 * random.nextFloat();
+            }
             scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
         } else {
             d("-> else");
@@ -253,13 +255,14 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         schedule(player, nowTime);
 
         for (TimeMessage message : messages) {
-            int rangeMinutes = message.getScheduleMinutesRange();
-            if (rangeMinutes == 0) {
+            Integer rangeMinutes = message.getScheduleMinutesMax();
+            if (rangeMinutes == null || rangeMinutes <= message.getScheduleMinutes()) {
                 sendDiscordNotify(player, message);
                 continue;
             }
             long delay = lastPlayed + (message.getScheduleMinutes() * 60L * 1000) - nowTime;
-            delay += (long) rangeMinutes * 60d * 1000 * random.nextFloat();
+            delay += (long) ((rangeMinutes - message.getScheduleMinutes()) * 60d * 1000 * random.nextFloat());
+            System.out.println("range=" + rangeMinutes + " | delay=" + delay + " (" + Math.round(delay / 1000d / 60) + "m)");
             scheduler.add(player.getUniqueId(), delay, () -> sendDiscordNotify(player, message));  // TODO: db check
         }
 

@@ -1,16 +1,18 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit.config;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 public class TimeMessage implements RandomMessage {
 
     private final int scheduleMinutes;
-    private final int scheduleMinutesRange;
+    private final @Nullable Integer scheduleMinutesMax;
     private final List<String> contents;
 
-    public TimeMessage(int scheduleMinutes, int scheduleMinutesRange, List<String> contents) {
+    public TimeMessage(int scheduleMinutes, @Nullable Integer scheduleMinutesMax, List<String> contents) {
         this.scheduleMinutes = scheduleMinutes;
-        this.scheduleMinutesRange = scheduleMinutesRange;
+        this.scheduleMinutesMax = scheduleMinutesMax;
         this.contents = contents;
     }
 
@@ -18,8 +20,8 @@ public class TimeMessage implements RandomMessage {
         return scheduleMinutes;
     }
 
-    public int getScheduleMinutesRange() {
-        return scheduleMinutesRange;
+    public @Nullable Integer getScheduleMinutesMax() {
+        return scheduleMinutesMax;
     }
 
     @Override

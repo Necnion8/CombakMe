@@ -1,5 +1,7 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit.config;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.List;
 
 public class LoopMessage implements RandomMessage {
@@ -7,12 +9,12 @@ public class LoopMessage implements RandomMessage {
     private final boolean enable;
     private final List<String> contents;
     private final int timerMinutes;
-    private final int timerMinutesRange;
+    private final @Nullable Integer timerMinutesMax;
 
-    public LoopMessage(boolean enable, int timerMinutes, int timerMinutesRange, List<String> contents) {
+    public LoopMessage(boolean enable, int timerMinutes, @Nullable Integer timerMinutesMax, List<String> contents) {
         this.enable = enable;
         this.timerMinutes = timerMinutes;
-        this.timerMinutesRange = timerMinutesRange;
+        this.timerMinutesMax = timerMinutesMax;
         this.contents = contents;
     }
 
@@ -24,8 +26,8 @@ public class LoopMessage implements RandomMessage {
         return timerMinutes;
     }
 
-    public int getTimerMinutesRange() {
-        return timerMinutesRange;
+    public @Nullable Integer getTimerMinutesMax() {
+        return timerMinutesMax;
     }
 
     @Override
