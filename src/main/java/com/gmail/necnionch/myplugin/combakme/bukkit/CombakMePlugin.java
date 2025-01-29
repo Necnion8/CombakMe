@@ -18,6 +18,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -43,7 +44,23 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 //        openDatabase();
 
         getServer().getPluginManager().registerEvents(this, this);
-        getServer().getScheduler().runTask(this, this::scheduleAll);  // wait for srv load
+        getServer().getScheduler().runTaskTimer(this, new Consumer<BukkitTask>() {
+            private int count;
+
+            @Override
+            public void accept(BukkitTask task) {
+                if (60 <= count++) {
+                    task.cancel();
+                    getLogger().warning("Failed to get DiscordSRV Account Link Manager");
+                    return;
+                }
+
+                if (srv.getAccountLinkManager() != null) {
+                    task.cancel();
+                    scheduleAll();
+                }
+            }
+        }, 20, 20);
     }
 
     @Override
