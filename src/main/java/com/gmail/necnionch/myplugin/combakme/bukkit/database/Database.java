@@ -1,10 +1,11 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit.database;
 
-import com.gmail.necnionch.myplugin.combakme.bukkit.CombakPlayer;
+import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.ScheduledCombak;
 
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 public interface Database {
 
@@ -17,8 +18,12 @@ public interface Database {
     void initDatabase() throws SQLException;
 
 
-    List<CombakPlayer> getPlayerAll() throws SQLException;
+    List<ScheduledCombak> getScheduledAll() throws SQLException;
 
-    void setPlayers(Collection<CombakPlayer> players) throws SQLException;
+    void addScheduled(Collection<ScheduledCombak> scheduledList) throws SQLException;
+
+    void removeScheduledByUUID(Collection<UUID> scheduledList) throws SQLException;
+
+    void removeScheduledByPlayer(Collection<UUID> players) throws SQLException;
 
 }

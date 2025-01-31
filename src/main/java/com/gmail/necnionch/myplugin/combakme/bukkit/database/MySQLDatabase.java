@@ -1,6 +1,6 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit.database;
 
-import com.gmail.necnionch.myplugin.combakme.bukkit.CombakPlayer;
+import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.ScheduledCombak;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.jetbrains.annotations.Nullable;
@@ -67,6 +67,7 @@ public class MySQLDatabase implements Database {
         dbConf.setJdbcUrl(url);
         dbConf.addDataSourceProperty("user", config.username);
         dbConf.addDataSourceProperty("password", config.password);
+        dbConf.setAutoCommit(true);
         config.options.forEach(dbConf::addDataSourceProperty);
         dbConf.setConnectionInitSql("SELECT 1");
 
@@ -100,42 +101,78 @@ public class MySQLDatabase implements Database {
     @Override
     public void initDatabase() throws SQLException {
         try (Connection connection = getConnection(false)) {
-            String sql = "CREATE TABLE IF NOT EXISTS `notified` (`uuid` VARCHAR(36) UNIQUE, `lastHours` INT)";
+            String sql = "CREATE TABLE IF NOT EXISTS `scheduled` (`id` VARCHAR(36) UNIQUE, `player` VARCHAR(36) UNIQUE, `c_minutes` INT, `c_minutes_max` INT, `scheduled_time` BIGINT)";
             try (Statement stmt = connection.createStatement()) {
                 stmt.executeUpdate(sql);
             }
         }
     }
 
+    private ScheduledCombak deserializeScheduledCombak(ResultSet resultSet) throws SQLException {
+        int mMax = resultSet.getInt("c_minutes_max");
+        return new ScheduledCombak(
+                UUID.fromString(resultSet.getString("id")),
+                UUID.fromString(resultSet.getString("player")),
+                resultSet.getInt("c_minutes"),
+                0 < mMax ? mMax : null,
+                resultSet.getLong("scheduled_time")
+        );
+    }
+
     @Override
-    public List<CombakPlayer> getPlayerAll() throws SQLException {
-        String sql = "SELECT * FROM `notified`";
+    public List<ScheduledCombak> getScheduledAll() throws SQLException {
+        String sql = "SELECT * FROM `scheduled`";
         try (Connection conn = getConnectionTry();
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet resultSet = stmt.executeQuery()) {
 
-            List<CombakPlayer> players = new ArrayList<>();
+            List<ScheduledCombak> scheduledList = new ArrayList<>();
             while (resultSet.next()) {
-                CombakPlayer p = new CombakPlayer(UUID.fromString(resultSet.getString("uuid")));
-                p.setLastNotifyHours(resultSet.getInt("lastHours"));
-                players.add(p);
+                scheduledList.add(deserializeScheduledCombak(resultSet));
             }
-            return players;
+            return scheduledList;
         }
     }
 
     @Override
-    public void setPlayers(Collection<CombakPlayer> players) throws SQLException {
-        if (players.isEmpty())
-            return;
-
-        String sql = "INSERT INTO `notified` VALUES (?, ?) ON DUPLICATE KEY UPDATE `lastHours` = ?";
+    public void addScheduled(Collection<ScheduledCombak> scheduledList) throws SQLException {
+        String sql = "INSERT INTO `scheduled` VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `scheduled_time` = ?";
         try (Connection conn = getConnectionTry();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
-            for (CombakPlayer player : players) {
-                stmt.setString(1, player.getId().toString());
-                stmt.setInt(2, player.getLastNotifyHours().orElse(-1));
-                stmt.setInt(3, player.getLastNotifyHours().orElse(-1));
+
+            for (ScheduledCombak scheduled : scheduledList) {
+                stmt.setString(1, scheduled.getScheduleId().toString());
+                stmt.setString(2, scheduled.getPlayerId().toString());
+                stmt.setInt(3, scheduled.getConfiguredMinutes());
+                stmt.setInt(4, Optional.ofNullable(scheduled.getConfiguredMinutesMax()).orElse(-1));
+                stmt.setLong(5, scheduled.getScheduledTime());
+                stmt.setLong(6, scheduled.getScheduledTime());
+                stmt.executeUpdate();
+            }
+        }
+    }
+
+    @Override
+    public void removeScheduledByUUID(Collection<UUID> scheduledList) throws SQLException {
+        String sql = "DELETE FROM `scheduled` WHERE `id` = ?";
+        try (Connection conn = getConnectionTry();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            for (UUID scheduledId : scheduledList) {
+                stmt.setString(1, scheduledId.toString());
+                stmt.executeUpdate();
+            }
+        }
+    }
+
+    @Override
+    public void removeScheduledByPlayer(Collection<UUID> players) throws SQLException {
+        String sql = "DELETE FROM `scheduled` WHERE `player` = ?";
+        try (Connection conn = getConnectionTry();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            for (UUID playerId : players) {
+                stmt.setString(1, playerId.toString());
                 stmt.executeUpdate();
             }
         }
