@@ -6,6 +6,10 @@ import com.gmail.necnionch.myplugin.combakme.bukkit.config.RandomMessage;
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.TimeMessage;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.Database;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
+import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.CombakScheduler;
+import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.ScheduledCombak;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.User;
 import github.scarsz.discordsrv.objects.managers.AccountLinkManager;
@@ -21,9 +25,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
 
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class CombakMePlugin extends JavaPlugin implements Listener {
@@ -33,15 +39,27 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
     private final CombakMeConfig mainConfig = new CombakMeConfig(this);
     private final CombakScheduler scheduler = new CombakScheduler(this, task -> getServer().getScheduler().runTask(this, task));
+    private final Consumer<Runnable> asyncExecutor = task -> getServer().getScheduler().runTaskAsynchronously(this, task);
     private @Nullable Database database;
     private final DiscordSRV srv = DiscordSRV.getPlugin();
     private @Nullable Permission vaultPermission;
+    //
+    private final Map<UUID, ScheduledCombak> scheduledRandoms = Maps.newHashMap();
+
+    public static String formatEpochTime(long time) {
+        return new SimpleDateFormat("yyyy/MM/dd hh:mm:ss").format(new Date(time));
+    }
 
     @Override
     public void onEnable() {
         setupVaultPermission();
         mainConfig.load();
-//        openDatabase();
+        openDatabase();
+
+        if (database == null) {
+            setEnabled(false);
+            return;
+        }
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getScheduler().runTaskTimer(this, new Consumer<BukkitTask>() {
@@ -60,12 +78,20 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
                     scheduleAll();
                 }
             }
-        }, 20, 20);
+        }, 0, 20);
     }
 
     @Override
     public void onDisable() {
         scheduler.destroy();
+
+        // add to database
+        try {
+            Objects.requireNonNull(database, "Database not initialized").addScheduled(scheduledRandoms.values());
+        } catch (Throwable e) {
+            getLogger().severe("Failed to keep schedule to database: " + e.getMessage());
+        }
+
         closeDatabase();
     }
 
@@ -170,14 +196,51 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
             return;
 
         long nowTime = System.currentTimeMillis();
-        d(() -> "now time: " + nowTime);
-        Map<String, UUID> links = getDiscordLinkedPlayers();
-        d(() -> "linked players -> " + links.size());
-        for (UUID playerId : links.values()) {
-            OfflinePlayer player = getServer().getOfflinePlayer(playerId);
-            schedule(player, nowTime);
-        }
+        d(() -> "now time: " + formatEpochTime(nowTime));
+        Set<UUID> links = Sets.newHashSet(getDiscordLinkedPlayers().values());
 
+        d(() -> "linked players -> " + links.size());
+        Map<UUID, OfflinePlayer> players = links.stream().collect(Collectors.toMap(id -> id, id -> getServer().getOfflinePlayer(id)));
+        players.values().forEach(p -> schedule(p, nowTime));
+
+        asyncExecutor.accept(() -> {
+            try {
+                List<ScheduledCombak> scheduledList = Objects.requireNonNull(database, "Database not initialized").getScheduledAll();
+                Map<String, TimeMessage> times = mainConfig.getMessages().stream().collect(Collectors.toMap(
+                        tim -> tim.getScheduleMinutes() + ":" + tim.getScheduleMinutesMax(), tim -> tim));
+
+                Set<UUID> removeSchedules = Sets.newHashSet();
+
+                for (ScheduledCombak scheduled : scheduledList) {
+                    OfflinePlayer player = players.get(scheduled.getPlayerId());
+
+                    // SRVでリンクされていない OR 既に過ぎている OR スケジュール時のlastPlayedより最近
+                    if (player == null || scheduled.getNotifySendTime() < nowTime || player.getLastPlayed() < scheduled.getLastPlayed()) {
+                        removeSchedules.add(scheduled.getScheduleId());
+                        continue;
+                    }
+
+                    // 使用される設定が消えている
+                    String key = scheduled.getConfiguredMinutes() + ":" + scheduled.getConfiguredMinutesMax();
+                    TimeMessage timeMessage = times.get(key);
+                    if (timeMessage == null) {
+                        removeSchedules.add(scheduled.getScheduleId());
+                        continue;
+                    }
+
+                    scheduledRandoms.put(scheduled.getScheduleId(), scheduled);
+                    scheduler.add(scheduled.getPlayerId(), scheduled.getNotifySendTime() - nowTime, () -> {
+                        scheduledRandoms.remove(scheduled.getScheduleId());
+                        sendDiscordNotify(player, timeMessage);
+                    });
+                }
+
+                database.removeScheduledByUUID(removeSchedules);
+
+            } catch (Throwable e) {
+                getLogger().log(Level.SEVERE, "Failed to scheduling from database", e);
+            }
+        });
     }
 
     public void schedule(OfflinePlayer player, long nowTime) {
@@ -185,7 +248,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         scheduler.cancel(player.getUniqueId());
 
         long lastPlayed = player.getLastPlayed();
-        d(() -> "lastPlayed -> " + lastPlayed + " (" + Math.round((nowTime - lastPlayed) / 1000d / 60) + "m)");
+        d(() -> "lastPlayed -> " + formatEpochTime(lastPlayed) + " (" + Math.round((nowTime - lastPlayed) / 1000d / 60) + "m)");
         if (player.isOnline() || lastPlayed == 0 || hasPermission(player, DISABLE_NOTIFY_PERMISSION)) {
             return;
         }
@@ -280,7 +343,13 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
             long delay = lastPlayed + (message.getScheduleMinutes() * 60L * 1000) - nowTime;
             delay += (long) ((rangeMinutes - message.getScheduleMinutes()) * 60d * 1000 * random.nextFloat());
             System.out.println("range=" + rangeMinutes + " | delay=" + delay + " (" + Math.round(delay / 1000d / 60) + "m)");
-            scheduler.add(player.getUniqueId(), delay, () -> sendDiscordNotify(player, message));  // TODO: db check
+
+            ScheduledCombak scheduledCombak = new ScheduledCombak(UUID.randomUUID(), player.getUniqueId(), message.getScheduleMinutes(), rangeMinutes, nowTime, System.currentTimeMillis() + delay);
+            scheduledRandoms.put(scheduledCombak.getScheduleId(), scheduledCombak);
+            scheduler.add(player.getUniqueId(), delay, () -> {
+                scheduledRandoms.remove(scheduledCombak.getScheduleId());
+                sendDiscordNotify(player, message);
+            }, () -> scheduledRandoms.remove(scheduledCombak.getScheduleId()));
         }
 
     }

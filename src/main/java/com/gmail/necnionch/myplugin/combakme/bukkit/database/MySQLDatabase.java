@@ -101,7 +101,7 @@ public class MySQLDatabase implements Database {
     @Override
     public void initDatabase() throws SQLException {
         try (Connection connection = getConnection(false)) {
-            String sql = "CREATE TABLE IF NOT EXISTS `scheduled` (`id` VARCHAR(36) UNIQUE, `player` VARCHAR(36) UNIQUE, `c_minutes` INT, `c_minutes_max` INT, `scheduled_time` BIGINT)";
+            String sql = "CREATE TABLE IF NOT EXISTS `scheduled` (`id` VARCHAR(36) UNIQUE, `player` VARCHAR(36) UNIQUE, `c_minutes` INT, `c_minutes_max` INT, `last_played` BIGINT, `notify_time` BIGINT)";
             try (Statement stmt = connection.createStatement()) {
                 stmt.executeUpdate(sql);
             }
@@ -115,7 +115,8 @@ public class MySQLDatabase implements Database {
                 UUID.fromString(resultSet.getString("player")),
                 resultSet.getInt("c_minutes"),
                 0 < mMax ? mMax : null,
-                resultSet.getLong("scheduled_time")
+                resultSet.getLong("last_played"),
+                resultSet.getLong("notify_time")
         );
     }
 
@@ -136,7 +137,7 @@ public class MySQLDatabase implements Database {
 
     @Override
     public void addScheduled(Collection<ScheduledCombak> scheduledList) throws SQLException {
-        String sql = "INSERT INTO `scheduled` VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `scheduled_time` = ?";
+        String sql = "INSERT INTO `scheduled` VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `last_played` = ?, `notify_time` = ?";
         try (Connection conn = getConnectionTry();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -145,8 +146,10 @@ public class MySQLDatabase implements Database {
                 stmt.setString(2, scheduled.getPlayerId().toString());
                 stmt.setInt(3, scheduled.getConfiguredMinutes());
                 stmt.setInt(4, Optional.ofNullable(scheduled.getConfiguredMinutesMax()).orElse(-1));
-                stmt.setLong(5, scheduled.getScheduledTime());
-                stmt.setLong(6, scheduled.getScheduledTime());
+                stmt.setLong(5, scheduled.getLastPlayed());
+                stmt.setLong(6, scheduled.getNotifySendTime());
+                stmt.setLong(7, scheduled.getLastPlayed());
+                stmt.setLong(8, scheduled.getNotifySendTime());
                 stmt.executeUpdate();
             }
         }

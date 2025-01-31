@@ -29,4 +29,8 @@ public class TimeMessage implements RandomMessage {
         return contents;
     }
 
+    public List<String> contents() {
+        return contents;
+    }
+
 }
