@@ -2,6 +2,8 @@ package com.gmail.necnionch.myplugin.combakme.bukkit.config;
 
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
 import com.gmail.necnionch.myplugin.combakme.common.BukkitConfigDriver;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -57,6 +59,7 @@ public class CombakMeConfig extends BukkitConfigDriver {
         messages.clear();
         debug = config.getBoolean("debug", false);
 
+        List<TimeMessage> loadMessages = Lists.newArrayList();
         Optional.ofNullable(getConfigList(config, "messages"))
                 .ifPresent(ls -> ls.stream()
                         .map(c -> new TimeMessage(
@@ -64,7 +67,14 @@ public class CombakMeConfig extends BukkitConfigDriver {
                                 parseTimeMax(c.getString("schedule-time")),
                                 c.getStringList("contents")))
                         .filter(c -> 0 < c.getScheduleMinutes())
-                        .forEach(messages::add));
+                        .forEach(loadMessages::add));
+
+        Map<String, TimeMessage> mapMessages = Maps.newHashMap();
+        for (TimeMessage timeMessage : loadMessages) {
+            String key = timeMessage.getScheduleMinutes() + ":" + timeMessage.getScheduleMinutesMax();
+            mapMessages.merge(key, timeMessage, (m, m2) -> { m.contents().addAll(m2.contents()); return m; });
+        }
+        messages.addAll(mapMessages.values());
         messages.sort(Comparator.comparing(TimeMessage::getScheduleMinutes)
                 .thenComparing(m -> Math.abs(Optional.ofNullable(m.getScheduleMinutesMax()).orElse(0))));
 
