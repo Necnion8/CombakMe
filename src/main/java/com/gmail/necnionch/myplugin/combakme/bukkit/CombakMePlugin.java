@@ -83,15 +83,16 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        scheduler.destroy();
-
-        // add to database
-        try {
-            Objects.requireNonNull(database, "Database not initialized").addScheduled(scheduledRandoms.values());
-        } catch (Throwable e) {
-            getLogger().severe("Failed to keep schedule to database: " + e.getMessage());
+        if (!scheduledRandoms.isEmpty()) {
+            // add to database
+            try {
+                Objects.requireNonNull(database, "Database not initialized").addScheduled(scheduledRandoms.values());
+            } catch (Throwable e) {
+                getLogger().severe("Failed to keep schedule to database: " + e.getMessage());
+            }
         }
 
+        scheduler.destroy();
         closeDatabase();
     }
 
@@ -214,8 +215,14 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
                 for (ScheduledCombak scheduled : scheduledList) {
                     OfflinePlayer player = players.get(scheduled.getPlayerId());
 
-                    // SRVでリンクされていない OR 既に過ぎている OR スケジュール時のlastPlayedより最近
-                    if (player == null || scheduled.getNotifySendTime() < nowTime || player.getLastPlayed() < scheduled.getLastPlayed()) {
+                    // SRVでリンクされていない OR オンライン
+                    if (player == null || player.isOnline()) {
+                        removeSchedules.add(scheduled.getScheduleId());
+                        continue;
+                    }
+
+                    // 既に過ぎている OR スケジュール時のlastPlayedより最近
+                    if (scheduled.getNotifySendTime() < nowTime || scheduled.getLastPlayed() < player.getLastPlayed()) {
                         removeSchedules.add(scheduled.getScheduleId());
                         continue;
                     }
@@ -342,9 +349,8 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
             }
             long delay = lastPlayed + (message.getScheduleMinutes() * 60L * 1000) - nowTime;
             delay += (long) ((rangeMinutes - message.getScheduleMinutes()) * 60d * 1000 * random.nextFloat());
-            System.out.println("range=" + rangeMinutes + " | delay=" + delay + " (" + Math.round(delay / 1000d / 60) + "m)");
 
-            ScheduledCombak scheduledCombak = new ScheduledCombak(UUID.randomUUID(), player.getUniqueId(), message.getScheduleMinutes(), rangeMinutes, nowTime, System.currentTimeMillis() + delay);
+            ScheduledCombak scheduledCombak = new ScheduledCombak(UUID.randomUUID(), player.getUniqueId(), message.getScheduleMinutes(), rangeMinutes, lastPlayed, System.currentTimeMillis() + delay);
             scheduledRandoms.put(scheduledCombak.getScheduleId(), scheduledCombak);
             scheduler.add(player.getUniqueId(), delay, () -> {
                 scheduledRandoms.remove(scheduledCombak.getScheduleId());
