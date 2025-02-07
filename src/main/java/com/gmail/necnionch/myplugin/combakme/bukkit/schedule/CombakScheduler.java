@@ -2,6 +2,7 @@ package com.gmail.necnionch.myplugin.combakme.bukkit.schedule;
 
 import com.gmail.necnionch.myplugin.combakme.bukkit.CombakMePlugin;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 
 import java.util.Timer;
@@ -23,7 +24,7 @@ public class CombakScheduler {
 
     public void cancelAll() {
         plugin.d("cancel all");
-        playerTasks.values().forEach(TimerTask::cancel);
+        Lists.newArrayList(playerTasks.values()).forEach(TimerTask::cancel);
         playerTasks.clear();
     }
 
@@ -52,6 +53,7 @@ public class CombakScheduler {
 
             @Override
             public boolean cancel() {
+                playerTasks.values().remove(this);
                 if (onCancel != null) {
                     try {
                         onCancel.run();
@@ -70,9 +72,12 @@ public class CombakScheduler {
     public void cancel(UUID playerId) {
         if (playerTasks.containsKey(playerId)) {
             plugin.d(() -> "cancel schedule : " + playerId);
-            playerTasks.get(playerId).forEach(TimerTask::cancel);
-            playerTasks.removeAll(playerId);
+            Lists.newArrayList(playerTasks.get(playerId)).forEach(TimerTask::cancel);
         }
+    }
+
+    public boolean isScheduledPlayer(UUID playerId) {
+        return playerTasks.containsKey(playerId);
     }
 
 }

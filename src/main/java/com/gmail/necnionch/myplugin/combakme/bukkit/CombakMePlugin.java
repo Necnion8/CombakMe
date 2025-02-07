@@ -86,6 +86,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         if (!scheduledRandoms.isEmpty()) {
             // add to database
             try {
+                // FIXME: scheduledRandomsから消されたスケジュールをDBからも消す (通知日が過ぎるか再ログインしていれば次回のscheduleAllで消える)
                 Objects.requireNonNull(database, "Database not initialized").addScheduled(scheduledRandoms.values());
             } catch (Throwable e) {
                 getLogger().severe("Failed to keep schedule to database: " + e.getMessage());
@@ -202,7 +203,6 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
         d(() -> "linked players -> " + links.size());
         Map<UUID, OfflinePlayer> players = links.stream().collect(Collectors.toMap(id -> id, id -> getServer().getOfflinePlayer(id)));
-        players.values().forEach(p -> schedule(p, nowTime));
 
         asyncExecutor.accept(() -> {
             try {
@@ -212,18 +212,22 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
                 Set<UUID> removeSchedules = Sets.newHashSet();
 
+                d("== database stored schedules check ==");
                 for (ScheduledCombak scheduled : scheduledList) {
                     OfflinePlayer player = players.get(scheduled.getPlayerId());
+                    d(() -> "- player: " + scheduled.getPlayerId());
 
                     // SRVでリンクされていない OR オンライン
                     if (player == null || player.isOnline()) {
                         removeSchedules.add(scheduled.getScheduleId());
+                        d("   cancelled - player is null OR online now");
                         continue;
                     }
 
                     // 既に過ぎている OR スケジュール時のlastPlayedより最近
                     if (scheduled.getNotifySendTime() < nowTime || scheduled.getLastPlayed() < player.getLastPlayed()) {
                         removeSchedules.add(scheduled.getScheduleId());
+                        d("   cancelled - scheduledTime < nowTime OR scheduledLastPlayed < player.lastPlayed");
                         continue;
                     }
 
@@ -232,17 +236,21 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
                     TimeMessage timeMessage = times.get(key);
                     if (timeMessage == null) {
                         removeSchedules.add(scheduled.getScheduleId());
+                        d("   cancelled - removed in config");
                         continue;
                     }
 
                     scheduledRandoms.put(scheduled.getScheduleId(), scheduled);
+                    d("   resume schedule");
                     scheduler.add(scheduled.getPlayerId(), scheduled.getNotifySendTime() - nowTime, () -> {
                         scheduledRandoms.remove(scheduled.getScheduleId());
                         sendDiscordNotify(player, timeMessage);
-                    });
+                        scheduleLoopMessageWhenCompleteTimeMessages(player);
+                    }, () -> scheduledRandoms.remove(scheduled.getScheduleId()));
                 }
 
                 database.removeScheduledByUUID(removeSchedules);
+                getServer().getScheduler().runTask(this, () -> players.values().forEach(p -> schedule(p, nowTime)));
 
             } catch (Throwable e) {
                 getLogger().log(Level.SEVERE, "Failed to scheduling from database", e);
@@ -252,7 +260,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     public void schedule(OfflinePlayer player, long nowTime) {
         d(() -> "on schedule : " + player.getUniqueId() + " (" + player.getName() + ")");
-        scheduler.cancel(player.getUniqueId());
+//        scheduler.cancel(player.getUniqueId());
 
         long lastPlayed = player.getLastPlayed();
         d(() -> "lastPlayed -> " + formatEpochTime(lastPlayed) + " (" + Math.round((nowTime - lastPlayed) / 1000d / 60) + "m)");
@@ -277,15 +285,36 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
             scheduler.add(player.getUniqueId(), delay, () -> onTime(player, times));
 
         } else if (messageLoop != null && messageLoop.isEnable()) {
-            d("-> loop message");
-            long delay = messageLoop.getTimerMinutes() * 60L * 1000;
-            if (messageLoop.getTimerMinutesMax() != null) {
-                delay += (long) messageLoop.getTimerMinutesMax() * 60d * 1000 * random.nextFloat();
+            if (scheduler.isScheduledPlayer(player.getUniqueId())) {
+                d("-> scheduled any match");
+            } else {
+                d("-> loop message");
+                long delay = messageLoop.getTimerMinutes() * 60L * 1000;
+                if (messageLoop.getTimerMinutesMax() != null) {
+                    delay += (long) messageLoop.getTimerMinutesMax() * 60d * 1000 * random.nextFloat();
+                }
+                scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
             }
-            scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
         } else {
             d("-> else");
         }
+    }
+
+    public void scheduleLoopMessageWhenCompleteTimeMessages(OfflinePlayer player) {
+        if (scheduler.isScheduledPlayer(player.getUniqueId()))
+            return;
+
+        LoopMessage messageLoop = mainConfig.getMessageLoop();
+        if (messageLoop == null || !messageLoop.isEnable())
+            return;
+
+        d("-> loop message");
+
+        long delay = messageLoop.getTimerMinutes() * 60L * 1000;
+        if (messageLoop.getTimerMinutesMax() != null) {
+            delay += (long) messageLoop.getTimerMinutesMax() * 60d * 1000 * random.nextFloat();
+        }
+        scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
     }
 
     public void sendDiscordNotify(OfflinePlayer player, RandomMessage message) {
@@ -339,8 +368,6 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         long lastPlayed = player.getLastPlayed();
         long nowTime = System.currentTimeMillis();
 
-        schedule(player, nowTime);
-
         for (TimeMessage message : messages) {
             Integer rangeMinutes = message.getScheduleMinutesMax();
             if (rangeMinutes == null || rangeMinutes <= message.getScheduleMinutes()) {
@@ -355,8 +382,11 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
             scheduler.add(player.getUniqueId(), delay, () -> {
                 scheduledRandoms.remove(scheduledCombak.getScheduleId());
                 sendDiscordNotify(player, message);
+                scheduleLoopMessageWhenCompleteTimeMessages(player);
             }, () -> scheduledRandoms.remove(scheduledCombak.getScheduleId()));
         }
+
+        schedule(player, nowTime);
 
     }
 

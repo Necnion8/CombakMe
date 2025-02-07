@@ -101,7 +101,7 @@ public class MySQLDatabase implements Database {
     @Override
     public void initDatabase() throws SQLException {
         try (Connection connection = getConnection(false)) {
-            String sql = "CREATE TABLE IF NOT EXISTS `scheduled` (`id` VARCHAR(36) UNIQUE, `player` VARCHAR(36) UNIQUE, `c_minutes` INT, `c_minutes_max` INT, `last_played` BIGINT, `notify_time` BIGINT)";
+            String sql = "CREATE TABLE IF NOT EXISTS `scheduled` (`id` VARCHAR(36) UNIQUE, `player` VARCHAR(36), `c_minutes` INT, `c_minutes_max` INT, `last_played` BIGINT, `notify_time` BIGINT)";
             try (Statement stmt = connection.createStatement()) {
                 stmt.executeUpdate(sql);
             }
