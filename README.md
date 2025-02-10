@@ -7,6 +7,7 @@
 ## 前提
 - Spigot 1.13 以上
 - [DiscordSRV](https://modrinth.com/plugin/discordsrv) (v1.29.0 でテスト)
+- [Vault](https://www.spigotmc.org/resources/34315) (オプション、要推奨)
 
 ## 権限
 | ノード                     | 説明            | デフォルト |
@@ -55,7 +56,7 @@
 >
 > # データベース設定
 > database:
->   type: mysql  # 使用できるデータベースの種類: sqlite, mysql
+>   type: sqlite  # 使用できるデータベースの種類: sqlite, mysql
 >   sqlite:
 >     filename: ./plugin.db
 >     options: {}
@@ -67,3 +68,6 @@
 >     options:
 >       autoReconnect: true
 > ```
+
+## ライセンス
+- [HikariCP](https://github.com/brettwooldridge/HikariCP) - Apache License 2.0

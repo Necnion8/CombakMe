@@ -37,7 +37,7 @@ unscheduled-message:
 
 # データベース設定
 database:
-  type: mysql  # 使用できるデータベースの種類: sqlite, mysql
+  type: sqlite  # 使用できるデータベースの種類: sqlite, mysql
   sqlite:
     filename: ./plugin.db
     options: {}
