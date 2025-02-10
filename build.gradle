@@ -30,14 +30,19 @@ repositories {
     maven {  // Vault
         url = 'https://jitpack.io'
     }
+
+    maven {  // PlaceholderAPI
+        url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
+    }
 }
 
 dependencies {
-    compileOnly 'org.jetbrains:annotations:24.0.0'
+    compileOnly "org.jetbrains:annotations:24.0.0"
     compileOnly "org.spigotmc:spigot-api:1.13.2-R0.1-SNAPSHOT"
     compileOnly "com.discordsrv:discordsrv:1.29.0"
     implementation "com.zaxxer:HikariCP:4.0.3" exclude group: "org.slf4j"
     compileOnly "com.github.MilkBowl:VaultAPI:1.7"
+    compileOnly "me.clip:placeholderapi:2.11.6"
 }
 
 tasks.named("shadowJar", ShadowJar) {

@@ -9,11 +9,13 @@ import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.SQLiteDatabase;
 import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.CombakScheduler;
 import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.ScheduledCombak;
+import com.gmail.necnionch.myplugin.combakme.bukkit.util.ReplacePlaceholder;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import github.scarsz.discordsrv.DiscordSRV;
 import github.scarsz.discordsrv.dependencies.jda.api.entities.User;
 import github.scarsz.discordsrv.objects.managers.AccountLinkManager;
+import me.clip.placeholderapi.PlaceholderAPI;
 import net.milkbowl.vault.permission.Permission;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
@@ -44,6 +46,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     private @Nullable CombakDatabase database;
     private final DiscordSRV srv = DiscordSRV.getPlugin();
     private @Nullable Permission vaultPermission;
+    private @Nullable ReplacePlaceholder placeholderReplacer;
     //
     private final Map<UUID, ScheduledCombak> scheduledRandoms = Maps.newHashMap();
 
@@ -54,6 +57,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         setupVaultPermission();
+        setupPlaceholders();
         mainConfig.load();
         openDatabase();
 
@@ -172,6 +176,21 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         RegisteredServiceProvider<Permission> reg = getServer().getServicesManager().getRegistration(Permission.class);
         if (reg != null) {
             vaultPermission = reg.getProvider();
+            getLogger().info("Hooked Vault Permission API");
+        }
+    }
+
+    private void setupPlaceholders() {
+        placeholderReplacer = null;
+        if (getServer().getPluginManager().isPluginEnabled("PlaceholderAPI")) {
+            try {
+                Class.forName("me.clip.placeholderapi.PlaceholderAPI");
+            } catch (ClassNotFoundException e) {
+                getLogger().warning("Unable to hook to PlaceholderAPI: " + e.getMessage());
+                return;
+            }
+            placeholderReplacer = PlaceholderAPI::setPlaceholders;
+            getLogger().info("Hooked PlaceholderAPI replacer");
         }
     }
 
@@ -189,6 +208,14 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
             return ((Player) player).hasPermission(node);
         }
         return false;
+    }
+
+    /**
+     * 文字列に含まれるプレースホルダを置換します<br>
+     * PlaceholderAPI連携が有効である場合のみ
+     */
+    public String processPlaceholders(OfflinePlayer player, String string) {
+        return placeholderReplacer != null ? placeholderReplacer.process(player, string) : string;
     }
 
     /**
@@ -361,8 +388,8 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         }
 
         Consumer<User> sendMessage = user -> user.openPrivateChannel().queue(channel -> {
-            String content = contents.get(random.nextInt(contents.size()));
             d(() -> "queue message : " + player.getUniqueId() + " : Discord " + user.getName());
+            String content = processPlaceholders(player, contents.get(random.nextInt(contents.size())));
             channel.sendMessage(content).queue();
         });
 

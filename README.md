@@ -8,6 +8,7 @@
 - Spigot 1.13 以上
 - [DiscordSRV](https://modrinth.com/plugin/discordsrv) (v1.29.0 でテスト)
 - [Vault](https://www.spigotmc.org/resources/34315) (オプション、要推奨)
+- [PlaceholderAPI](https://www.spigotmc.org/resources/6245) (オプション)
 
 ## 権限
 | ノード                     | 説明            | デフォルト |
