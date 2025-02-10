@@ -1,6 +1,5 @@
-
 # 通知メッセージの ON/OFF
-# 権限 combakme.disable-notify があるプレイヤーに対しては送信しません
+# ※ この設定に関わらず、権限 combakme.disable-notify があるプレイヤーは送信しません
 enable-messages: true
 
 # 各時間ごとにメッセージの内容を設定できます
@@ -29,10 +28,10 @@ schedules:
     contents:
       - "今日は参加しませんか？"
 
-# 通常の messages 設定にある経過時間を超えた後のメッセージ設定 (繰り返し)
+# 通知がスケジュールされていない場合のメッセージ設定 (繰り返し)
 unscheduled-message:
   enable: false
-  timer-time: 0m,15m
+  timer-time: 2h,4h  # 2時間から4時間の範囲で繰り返し通知する (通知間隔には気を付けてください)
   contents: []
 
 

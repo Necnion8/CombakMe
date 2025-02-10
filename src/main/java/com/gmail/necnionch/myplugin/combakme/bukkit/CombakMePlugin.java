@@ -177,6 +177,10 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
 
     //
 
+    /**
+     * プレイヤーが対象の権限を持っているか判定します<br>
+     * Vault連携が有効である場合のみ、オフラインのプレイヤーを処理できます。
+     */
     public boolean hasPermission(OfflinePlayer player, String node) {
         if (vaultPermission != null) {
             return vaultPermission.playerHas(null, player, node);
@@ -187,11 +191,12 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         return false;
     }
 
-    public boolean hasPermission(UUID playerId, String node) {
-        return hasPermission(Optional.<OfflinePlayer>ofNullable(getServer().getPlayer(playerId))
-                .orElseGet(() -> getServer().getOfflinePlayer(playerId)), node);
-    }
-
+    /**
+     * アカウントリンクされているプレイヤーを返します
+     *
+     * @return Discord ID とプレイヤーUUID のマップ
+     * @throws IllegalStateException DiscordSRVのアカウントマネージャが利用できない
+     */
     public Map<String, UUID> getDiscordLinkedPlayers() {
         AccountLinkManager links = srv.getAccountLinkManager();
         if (links == null)
@@ -199,6 +204,10 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         return links.getLinkedAccounts();
     }
 
+    /**
+     * 既存のスケジュールを全てキャンセルし、アカウントリンクされている全てのプレイヤーのスケジュールを設定します。<br>
+     * データベースに保存されている既存のスケジュールも開始します。
+     */
     public void scheduleAll() {
         d("on scheduleAll");
         scheduler.cancelAll();
@@ -267,6 +276,9 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         });
     }
 
+    /**
+     * タイムメッセージまたはループメッセージをスケジュールします
+     */
     public void schedule(OfflinePlayer player, long nowTime) {
         d(() -> "on schedule : " + player.getUniqueId() + " (" + player.getName() + ")");
 //        scheduler.cancel(player.getUniqueId());
@@ -309,6 +321,10 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         }
     }
 
+    /**
+     * ループメッセージをスケジュールします<br>
+     * プレイヤーに何らかのスケジュールがある場合やループメッセージの設定が無効である場合は何もしません。
+     */
     public void scheduleLoopMessageWhenCompleteTimeMessages(OfflinePlayer player) {
         if (scheduler.isScheduledPlayer(player.getUniqueId()))
             return;
@@ -326,6 +342,10 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         scheduler.add(player.getUniqueId(), delay, () -> onTime(player, messageLoop));
     }
 
+    /**
+     * プレイヤーに紐づけられたDiscordアカウントにランダムメッセージを送信します<br>
+     * DiscordSRVが利用できない場合やアカウントがリンクされていないなどの理由で失敗しても静かに無視します。
+     */
     public void sendDiscordNotify(OfflinePlayer player, RandomMessage message) {
         d(() -> "on send notify : " + player.getUniqueId());
         List<String> contents = message.getContents();
@@ -341,7 +361,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         }
 
         Consumer<User> sendMessage = user -> user.openPrivateChannel().queue(channel -> {
-            String content = contents.get(new Random().nextInt(contents.size()));
+            String content = contents.get(random.nextInt(contents.size()));
             d(() -> "queue message : " + player.getUniqueId() + " : Discord " + user.getName());
             channel.sendMessage(content).queue();
         });
@@ -372,6 +392,10 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         });
     }
 
+    /**
+     * タイムメッセージを処理します。<br>
+     * スケジュール時間になっているメッセージは送信し、時間変動があるメッセージは新たにスケジュールを追加します。
+     */
     private void onTime(OfflinePlayer player, List<TimeMessage> messages) {
         d(() -> "on time (timeMessage): " + player.getUniqueId());
         long lastPlayed = player.getLastPlayed();
