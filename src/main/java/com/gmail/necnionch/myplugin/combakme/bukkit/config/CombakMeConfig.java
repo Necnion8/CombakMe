@@ -1,6 +1,7 @@
 package com.gmail.necnionch.myplugin.combakme.bukkit.config;
 
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
+import com.gmail.necnionch.myplugin.combakme.bukkit.database.SQLiteDatabase;
 import com.gmail.necnionch.myplugin.combakme.common.BukkitConfigDriver;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -101,6 +102,17 @@ public class CombakMeConfig extends BukkitConfigDriver {
         return new MySQLDatabase.Config(address, database, username, password, options);
     }
 
+    public SQLiteDatabase.Config getSQLiteConfig() {
+        String filename = config.getString("database.sqlite.filename", "./plugin.db");
+
+        @SuppressWarnings("DataFlowIssue")
+        Map<String, Object> options = Optional.ofNullable(config.getConfigurationSection("database.sqlite.options"))
+                .map(c -> c.getKeys(false).stream().collect(Collectors.toMap(k -> k, c::get)))
+                .orElseGet(Collections::emptyMap);
+
+        return new SQLiteDatabase.Config(filename, options);
+    }
+
     //
 
     public boolean isDebug() {
@@ -109,6 +121,10 @@ public class CombakMeConfig extends BukkitConfigDriver {
 
     public boolean isEnabledMessages() {
         return config.getBoolean("enable-messages", false);
+    }
+
+    public String getDatabaseType() {
+        return config.getString("database.type", "sqlite");
     }
 
     public List<TimeMessage> getMessages() {

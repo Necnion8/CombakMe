@@ -4,8 +4,9 @@ import com.gmail.necnionch.myplugin.combakme.bukkit.config.CombakMeConfig;
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.LoopMessage;
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.RandomMessage;
 import com.gmail.necnionch.myplugin.combakme.bukkit.config.TimeMessage;
-import com.gmail.necnionch.myplugin.combakme.bukkit.database.Database;
+import com.gmail.necnionch.myplugin.combakme.bukkit.database.CombakDatabase;
 import com.gmail.necnionch.myplugin.combakme.bukkit.database.MySQLDatabase;
+import com.gmail.necnionch.myplugin.combakme.bukkit.database.SQLiteDatabase;
 import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.CombakScheduler;
 import com.gmail.necnionch.myplugin.combakme.bukkit.schedule.ScheduledCombak;
 import com.google.common.collect.Maps;
@@ -40,7 +41,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
     private final CombakMeConfig mainConfig = new CombakMeConfig(this);
     private final CombakScheduler scheduler = new CombakScheduler(this, task -> getServer().getScheduler().runTask(this, task));
     private final Consumer<Runnable> asyncExecutor = task -> getServer().getScheduler().runTaskAsynchronously(this, task);
-    private @Nullable Database database;
+    private @Nullable CombakDatabase database;
     private final DiscordSRV srv = DiscordSRV.getPlugin();
     private @Nullable Permission vaultPermission;
     //
@@ -111,7 +112,15 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         if (database != null && !database.isClosed())
             return;
 
-        database = new MySQLDatabase(mainConfig.getMySQLConfig());
+        if (mainConfig.getDatabaseType().equalsIgnoreCase("mysql")) {
+            database = new MySQLDatabase(mainConfig.getMySQLConfig());
+        } else if (mainConfig.getDatabaseType().equalsIgnoreCase("sqlite")) {
+            database = new SQLiteDatabase(getDataFolder(), mainConfig.getSQLiteConfig());
+        } else {
+            getLogger().warning("Unknown database type: " + mainConfig.getDatabaseType() + " (fallback to sqlite)");
+            database = new SQLiteDatabase(getDataFolder(), mainConfig.getSQLiteConfig());
+        }
+
         try {
             if (database.openConnection()) {
                 try {
@@ -147,7 +156,7 @@ public final class CombakMePlugin extends JavaPlugin implements Listener {
         database = null;
     }
 
-    public Database getDatabase() {
+    public CombakDatabase getDatabase() {
         if (database == null || database.isClosed())
             throw new IllegalStateException("Database is not available");
         return database;

@@ -38,7 +38,10 @@ unscheduled-message:
 
 # データベース設定
 database:
-  type: mysql  # 現在は mysql のみ
+  type: mysql  # 使用できるデータベースの種類: sqlite, mysql
+  sqlite:
+    filename: ./plugin.db
+    options: {}
   mysql:
     username: root
     password: "password"

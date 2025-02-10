@@ -5,40 +5,28 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.sql.*;
 import java.util.*;
 
-public class MySQLDatabase implements CombakDatabase {
+public class SQLiteDatabase implements CombakDatabase {
 
     private final Config config;
+    private final File dbDirectory;
     private @Nullable HikariDataSource hikari;
 
     public static class Config {
 
-        private final String address;
-        private final String database;
-        private final String username;
-        private final String password;
+        private final String filename;
         private final Map<String, Object> options;
 
-        public Config(String address, String database, String username, String password, Map<String, Object> options) {
-            this.address = address;
-            this.database = database;
-            this.username = username;
-            this.password = password;
+        public Config(String filename, Map<String, Object> options) {
+            this.filename = filename;
             this.options = options;
         }
 
-        public String getAddress() {
-            return address;
-        }
-
-        public String getDatabase() {
-            return database;
-        }
-
-        public String getUsername() {
-            return username;
+        public String getFilename() {
+            return filename;
         }
 
         public Map<String, Object> options() {
@@ -46,27 +34,35 @@ public class MySQLDatabase implements CombakDatabase {
         }
     }
 
-    public MySQLDatabase(Config config) {
+    public SQLiteDatabase(File dbDirectory, Config config) {
         this.config = config;
+        this.dbDirectory = dbDirectory;
     }
 
     public Config getConfig() {
         return config;
     }
 
+    public File getParentDir() {
+        return dbDirectory;
+    }
 
     @Override
     public boolean openConnection() {
         if (!isClosed())
             throw new IllegalStateException("Already connection available");
 
-        String url = "jdbc:mysql://" + config.address + "/" + config.database;
+        File dbFile = new File(dbDirectory, config.filename);
+        File dbParent = dbFile.getParentFile();
+        if (!dbParent.exists() && !dbParent.mkdirs()) {
+            throw new RuntimeException("Failed to create database parent directory: " + dbParent);
+        }
+
+        String url = "jdbc:sqlite:" + dbFile.toURI();
         HikariConfig dbConf = new HikariConfig();
         dbConf.setPoolName("CombakMe-HikariPool");
-        dbConf.setDriverClassName("com.mysql.cj.jdbc.Driver");
+        dbConf.setDriverClassName("org.sqlite.JDBC");
         dbConf.setJdbcUrl(url);
-        dbConf.addDataSourceProperty("user", config.username);
-        dbConf.addDataSourceProperty("password", config.password);
         dbConf.setAutoCommit(true);
         config.options.forEach(dbConf::addDataSourceProperty);
         dbConf.setConnectionInitSql("SELECT 1");
@@ -137,7 +133,7 @@ public class MySQLDatabase implements CombakDatabase {
 
     @Override
     public void addScheduled(Collection<ScheduledCombak> scheduledList) throws SQLException {
-        String sql = "INSERT INTO `scheduled` VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE `last_played` = ?, `notify_time` = ?";
+        String sql = "INSERT OR REPLACE INTO `scheduled` VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConnectionTry();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -148,8 +144,6 @@ public class MySQLDatabase implements CombakDatabase {
                 stmt.setInt(4, Optional.ofNullable(scheduled.getConfiguredMinutesMax()).orElse(-1));
                 stmt.setLong(5, scheduled.getLastPlayed());
                 stmt.setLong(6, scheduled.getNotifySendTime());
-                stmt.setLong(7, scheduled.getLastPlayed());
-                stmt.setLong(8, scheduled.getNotifySendTime());
                 stmt.executeUpdate();
             }
         }
