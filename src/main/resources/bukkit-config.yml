@@ -4,7 +4,7 @@
 enable-messages: true
 
 # 各時間ごとにメッセージの内容を設定できます
-messages:
+schedules:
   - schedule-time: 12h0m  # 最終ログインから12時間0分
     contents:  # ランダムで送信する内容を決定します
       - "サーバーをログアウトしてから１２時間経過しました"
@@ -30,7 +30,7 @@ messages:
       - "今日は参加しませんか？"
 
 # 通常の messages 設定にある経過時間を超えた後のメッセージ設定 (繰り返し)
-message-2:
+unscheduled-message:
   enable: false
   timer-time: 0m,15m
   contents: []

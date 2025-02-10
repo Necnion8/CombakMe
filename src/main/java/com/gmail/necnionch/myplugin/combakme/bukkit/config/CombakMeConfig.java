@@ -60,7 +60,7 @@ public class CombakMeConfig extends BukkitConfigDriver {
         debug = config.getBoolean("debug", false);
 
         List<TimeMessage> loadMessages = Lists.newArrayList();
-        Optional.ofNullable(getConfigList(config, "messages"))
+        Optional.ofNullable(getConfigList(config, "schedules"))
                 .ifPresent(ls -> ls.stream()
                         .map(c -> new TimeMessage(
                                 parseTime(c.getString("schedule-time")),
@@ -79,10 +79,10 @@ public class CombakMeConfig extends BukkitConfigDriver {
                 .thenComparing(m -> Math.abs(Optional.ofNullable(m.getScheduleMinutesMax()).orElse(0))));
 
         messageLoop = new LoopMessage(
-                config.getBoolean("message-2.enable", false),
-                parseTime(config.getString("message-2.timer-time")),
-                parseTimeMax(config.getString("message-2.timer-time")),
-                config.getStringList("message-2.contents")
+                config.getBoolean("unscheduled-message.enable", false),
+                parseTime(config.getString("unscheduled-message.timer-time")),
+                parseTimeMax(config.getString("unscheduled-message.timer-time")),
+                config.getStringList("unscheduled-message.contents")
         );
         return true;
     }
